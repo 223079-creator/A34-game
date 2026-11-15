@@ -194,8 +194,9 @@
         const mouse = { x: cw / 2, y: ch / 2, active: false };
 
         function updateMousePos(e) {
-            mouse.x = e.clientX || (e.touches && e.touches[0].clientX);
-            mouse.y = e.clientY || (e.touches && e.touches[0].clientY);
+            const pointer = e.touches?.[0] || e;
+            mouse.x = pointer.clientX;
+            mouse.y = pointer.clientY;
             mouse.active = true;
             if(gameState === 'playing' && instruction.style.opacity !== '0') {
                 instruction.style.opacity = '0'; // Hide instruction on first move
@@ -265,6 +266,9 @@
         let gameState = 'start'; // start, playing, gameover
         let score = 0;
         let frameCount = 0;
+        const STEP_MS = 1000 / 60;
+        let lastFrameTime = 0;
+        let updateAccumulator = 0;
         let screenShake = 0;
         
         let player = {};
@@ -281,6 +285,10 @@
         const COLOR_BULLET = '#ff0';
 
         function initGame() {
+            frameCount = 0;
+            updateAccumulator = 0;
+            lastFrameTime = performance.now();
+            mouse.active = false;
             player = {
                 x: cw / 2, y: ch / 2,
                 vx: 0, vy: 0,
@@ -681,10 +689,16 @@
         /**
          * --- Game Loop ---
          */
-        function gameLoop() {
+        function gameLoop(time) {
             if (gameState !== 'playing') return;
-            
-            update();
+
+            // 既存の60fps向け調整を保ち、描画回数とゲームの進行を分離する。
+            updateAccumulator += Math.min(Math.max(time - lastFrameTime, 0), 100);
+            lastFrameTime = time;
+            while (updateAccumulator >= STEP_MS && gameState === 'playing') {
+                update();
+                updateAccumulator -= STEP_MS;
+            }
             draw();
             
             requestAnimationFrame(gameLoop);
